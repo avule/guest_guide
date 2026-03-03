@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/welcomeFragment">
+
+    <fragment
+        android:id="@+id/welcomeFragment"
+        android:name="com.example.guestguide.ui.welcome.WelcomeFragment"
+        android:label="Welcome" >
+        <!-- Sada vodi na Login umesto direktno na Setup -->
+        <action
+            android:id="@+id/action_welcome_to_admin"
+            app:destination="@id/adminLoginFragment" />
+        <action
+            android:id="@+id/action_welcome_to_guest"
+            app:destination="@id/guestHomeFragment" />
+    </fragment>
+
+    <!-- NOVI FRAGMENT: Admin Login -->
+    <fragment
+        android:id="@+id/adminLoginFragment"
+        android:name="com.example.guestguide.ui.admin.AdminLoginFragment"
+        android:label="Admin Login" >
+
+        <!-- Akcija za prelazak na Setup nakon uspešnog logina -->
+        <!-- popUpTo="@id/welcomeFragment" znači da Back dugme vraća na početak, a ne na Login -->
+        <action
+            android:id="@+id/action_login_to_setup"
+            app:destination="@id/adminSetupFragment"
+            app:popUpTo="@id/welcomeFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/adminSetupFragment"
+        android:name="com.example.guestguide.ui.admin.AdminSetupFragment"
+        android:label="Admin Setup" />
+
+    <fragment
+        android:id="@+id/guestHomeFragment"
+        android:name="com.example.guestguide.ui.guest.GuestHomeFragment"
+        android:label="Guest Home" >
+
+        <action
+            android:id="@+id/action_guest_home_to_explore"
+            app:destination="@id/guestExploreFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/guestExploreFragment"
+        android:name="com.example.guestguide.ui.guest.GuestExploreFragment"
+        android:label="Explore" />
+</navigation>
