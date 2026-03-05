@@ -150,6 +150,14 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
     }
 
 
+    // Jednokratna provjera da li apartman postoji (za WelcomeFragment)
+    fun verifyApartmentCode(code: String, onResult: (Boolean) -> Unit) {
+        db.collection("apartments").document(code)
+            .get()
+            .addOnSuccessListener { doc -> onResult(doc.exists()) }
+            .addOnFailureListener { onResult(false) }
+    }
+
     fun connectToApartment(accessCode: String) {
         val currentState = _adminApartmentData.value
         if (currentApartmentCode == accessCode && currentState is Resource.Success) {
