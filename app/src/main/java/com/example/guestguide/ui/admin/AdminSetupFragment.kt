@@ -66,10 +66,19 @@ class AdminSetupFragment : Fragment() {
         binding.btnSaveAndGenerate.setOnClickListener { saveApartmentData() }
 
         binding.btnAddPlace.setOnClickListener {
-            val currentCode = viewModel.existingAccessCode ?: binding.tvGeneratedCode.text.toString()
-            dialogHelper.showAddPlaceDialog(null, currentCode)
+            if (viewModel.existingAccessCode == null) {
+                Toast.makeText(context, "Sačuvajte apartman prvo!", Toast.LENGTH_SHORT).show()
+            } else {
+                dialogHelper.showAddPlaceDialog(null, viewModel.existingAccessCode!!)
+            }
         }
-        binding.btnAddContact.setOnClickListener { dialogHelper.showAddContactDialog(null) }
+        binding.btnAddContact.setOnClickListener {
+            if (viewModel.existingAccessCode == null) {
+                Toast.makeText(context, "Sačuvajte apartman prvo!", Toast.LENGTH_SHORT).show()
+            } else {
+                dialogHelper.showAddContactDialog(null)
+            }
+        }
 
         binding.ivReset.setOnClickListener {
             createNewApartmentMode()
@@ -188,6 +197,7 @@ class AdminSetupFragment : Fragment() {
     private fun createNewApartmentMode() {
         viewModel.isCreatingNew = true
         viewModel.existingAccessCode = null
+        viewModel.clearCurrentApartment()
         resetFormUI()
         binding.btnSaveAndGenerate.text = "SAČUVAJ NOVI APARTMAN"
         Toast.makeText(context, "Unesite podatke za novi apartman.", Toast.LENGTH_SHORT).show()

@@ -36,12 +36,6 @@ class WelcomeFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Popuni polje sa zadnjim korištenim kodom (lokalno)
-        val lastCode = prefs.getString("last_access_code", "")
-        if (!lastCode.isNullOrEmpty()) {
-            binding.etCode.setText(lastCode)
-        }
-
         binding.btnEnter.setOnClickListener {
             val code = binding.etCode.text.toString().uppercase().trim()
 

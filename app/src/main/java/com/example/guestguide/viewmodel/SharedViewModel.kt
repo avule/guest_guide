@@ -64,9 +64,18 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
 
     fun logout() {
         auth.signOut()
+        clearCurrentApartment()
         _adminApartmentData.value = Resource.Success(null)
         _ownedApartments.value = emptyList()
+    }
+
+    fun clearCurrentApartment() {
         currentApartmentCode = null
+        apartmentListener?.remove()
+        recListener?.remove()
+        contactListener?.remove()
+        _contacts.value = emptyList()
+        _recommendations.value = emptyList()
     }
 
     fun updateProfile(currentPass: String, newEmail: String, newPass: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
@@ -143,6 +152,7 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
                     if (currentApartmentCode == null && apartments.isNotEmpty()) {
                         connectToApartment(apartments[0].accessCode)
                     } else if (apartments.isEmpty()) {
+                        clearCurrentApartment()
                         _adminApartmentData.value = Resource.Success(null)
                     }
                 }
@@ -210,12 +220,15 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         val ownerId = auth.currentUser?.uid ?: ""
         val apartmentWithOwner = apartment.copy(ownerId = ownerId)
 
+        currentApartmentCode = apartment.accessCode
+
         db.collection("apartments").document(apartment.accessCode)
             .set(apartmentWithOwner)
             .addOnSuccessListener {
                 connectToApartment(apartment.accessCode)
             }
             .addOnFailureListener { e ->
+                currentApartmentCode = null
                 _adminApartmentData.value = Resource.Error(e.message ?: "Greška pri čuvanju")
             }
     }
