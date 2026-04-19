@@ -3,6 +3,7 @@ package com.example.guestguide.viewmodel
 import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.guestguide.data.model.Apartment
 import com.example.guestguide.data.model.Contact
 import com.example.guestguide.data.model.Recommendation
@@ -11,9 +12,16 @@ import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
+// Centralni ViewModel koji dijele svi fragmenti putem activityViewModels().
+// Sadrži svu poslovnu logiku: autentifikaciju, CRUD operacije i real-time Firestore listenere.
+// Fragmenti komuniciraju međusobno isključivo preko StateFlow-ova iz ovog ViewModela.
 class SharedViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db = FirebaseFirestore.getInstance()
@@ -21,17 +29,16 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
 
     private var currentApartmentCode: String? = null
 
-    // Admin UI state (survives rotation)
+    // Admin UI stanje (preživljava rotaciju ekrana jer je u ViewModelu)
     var isCreatingNew: Boolean = false
     var existingAccessCode: String? = null
     var currentApartmentImageUrl: String = ""
 
-    // Listeners
     private var apartmentListener: ListenerRegistration? = null
     private var recListener: ListenerRegistration? = null
     private var contactListener: ListenerRegistration? = null
+    private var apartmentsListListener: ListenerRegistration? = null
 
-    // State Flows
     private val _adminApartmentData = MutableStateFlow<Resource<Apartment?>>(Resource.Loading)
     val adminApartmentData: StateFlow<Resource<Apartment?>> = _adminApartmentData
 
@@ -48,22 +55,32 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
     fun getUserEmail() = auth.currentUser?.email ?: ""
 
     fun login(email: String, pass: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
-        auth.signInWithEmailAndPassword(email, pass)
-            .addOnSuccessListener {
+        viewModelScope.launch {
+            try {
+                auth.signInWithEmailAndPassword(email, pass).await()
                 loadUserApartments()
                 onSuccess()
+            } catch (e: Exception) {
+                onError(e.message ?: "Greška")
             }
-            .addOnFailureListener { onError(it.message ?: "Greška") }
+        }
     }
 
     fun register(email: String, pass: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
-        auth.createUserWithEmailAndPassword(email, pass)
-            .addOnSuccessListener { onSuccess() }
-            .addOnFailureListener { onError(it.message ?: "Greška") }
+        viewModelScope.launch {
+            try {
+                auth.createUserWithEmailAndPassword(email, pass).await()
+                onSuccess()
+            } catch (e: Exception) {
+                onError(e.message ?: "Greška")
+            }
+        }
     }
 
     fun logout() {
         auth.signOut()
+        apartmentsListListener?.remove()
+        apartmentsListListener = null
         clearCurrentApartment()
         _adminApartmentData.value = Resource.Success(null)
         _ownedApartments.value = emptyList()
@@ -78,6 +95,8 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         _recommendations.value = emptyList()
     }
 
+    // Promjena email-a i/ili lozinke — zahtijeva re-autentifikaciju sa trenutnom lozinkom.
+    // Ako su oba tražena, paralelno se izvršavaju preko async/awaitAll.
     fun updateProfile(currentPass: String, newEmail: String, newPass: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         val user = auth.currentUser
         if (user == null || user.email == null) {
@@ -85,59 +104,42 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
             return
         }
 
-        val credential = EmailAuthProvider.getCredential(user.email!!, currentPass)
-
-        user.reauthenticate(credential)
-            .addOnSuccessListener {
-                val needsEmailUpdate = newEmail.isNotEmpty() && newEmail != user.email
-                val needsPassUpdate = newPass.isNotEmpty()
-
-                if (!needsEmailUpdate && !needsPassUpdate) {
-                    onSuccess()
-                    return@addOnSuccessListener
-                }
-
-                var pendingOps = (if (needsEmailUpdate) 1 else 0) + (if (needsPassUpdate) 1 else 0)
-                var hasError = false
-
-                fun checkComplete() {
-                    pendingOps--
-                    if (pendingOps == 0 && !hasError) {
-                        onSuccess()
-                    }
-                }
-
-                if (needsEmailUpdate) {
-                    user.verifyBeforeUpdateEmail(newEmail)
-                        .addOnSuccessListener { checkComplete() }
-                        .addOnFailureListener { e ->
-                            if (!hasError) {
-                                hasError = true
-                                onError("Greška pri promjeni emaila: ${e.message}")
-                            }
-                        }
-                }
-
-                if (needsPassUpdate) {
-                    user.updatePassword(newPass)
-                        .addOnSuccessListener { checkComplete() }
-                        .addOnFailureListener { e ->
-                            if (!hasError) {
-                                hasError = true
-                                onError("Greška pri promjeni šifre: ${e.message}")
-                            }
-                        }
-                }
-            }
-            .addOnFailureListener {
+        viewModelScope.launch {
+            try {
+                val credential = EmailAuthProvider.getCredential(user.email!!, currentPass)
+                user.reauthenticate(credential).await()
+            } catch (_: Exception) {
                 onError("Trenutna lozinka nije tačna.")
+                return@launch
             }
+
+            val needsEmailUpdate = newEmail.isNotEmpty() && newEmail != user.email
+            val needsPassUpdate = newPass.isNotEmpty()
+
+            if (!needsEmailUpdate && !needsPassUpdate) {
+                onSuccess()
+                return@launch
+            }
+
+            try {
+                val ops = buildList {
+                    if (needsEmailUpdate) add(async { user.verifyBeforeUpdateEmail(newEmail).await() })
+                    if (needsPassUpdate) add(async { user.updatePassword(newPass).await() })
+                }
+                ops.awaitAll()
+                onSuccess()
+            } catch (e: Exception) {
+                onError(e.message ?: "Greška pri ažuriranju profila")
+            }
+        }
     }
 
+    // Učitava sve apartmane vlasnika i automatski selektuje prvi ako nijedan nije izabran
     fun loadUserApartments() {
         val userId = auth.currentUser?.uid ?: return
 
-        db.collection("apartments")
+        apartmentsListListener?.remove()
+        apartmentsListListener = db.collection("apartments")
             .whereEqualTo("ownerId", userId)
             .addSnapshotListener { snapshot, e ->
                 if (e != null) {
@@ -162,12 +164,17 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
 
     // Jednokratna provjera da li apartman postoji (za WelcomeFragment)
     fun verifyApartmentCode(code: String, onResult: (Boolean) -> Unit) {
-        db.collection("apartments").document(code)
-            .get()
-            .addOnSuccessListener { doc -> onResult(doc.exists()) }
-            .addOnFailureListener { onResult(false) }
+        viewModelScope.launch {
+            try {
+                val doc = db.collection("apartments").document(code).get().await()
+                onResult(doc.exists())
+            } catch (e: Exception) {
+                onResult(false)
+            }
+        }
     }
 
+    // Postavlja real-time listenere na apartman, preporuke i kontakte iz Firestore-a
     fun connectToApartment(accessCode: String) {
         val currentState = _adminApartmentData.value
         if (currentApartmentCode == accessCode && currentState is Resource.Success) {
@@ -215,6 +222,7 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
             }
     }
 
+    // Čuva novi ili ažurira postojeći apartman u Firestore-u
     fun saveApartmentSettings(apartment: Apartment) {
         _adminApartmentData.value = Resource.Loading
         val ownerId = auth.currentUser?.uid ?: ""
@@ -222,68 +230,113 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
 
         currentApartmentCode = apartment.accessCode
 
-        db.collection("apartments").document(apartment.accessCode)
-            .set(apartmentWithOwner)
-            .addOnSuccessListener {
+        viewModelScope.launch {
+            try {
+                db.collection("apartments").document(apartment.accessCode)
+                    .set(apartmentWithOwner).await()
                 connectToApartment(apartment.accessCode)
-            }
-            .addOnFailureListener { e ->
+            } catch (e: Exception) {
                 currentApartmentCode = null
                 _adminApartmentData.value = Resource.Error(e.message ?: "Greška pri čuvanju")
             }
+        }
     }
 
     fun deleteApartment(accessCode: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
-        db.collection("apartments").document(accessCode)
-            .delete()
-            .addOnSuccessListener {
+        viewModelScope.launch {
+            try {
+                db.collection("apartments").document(accessCode).delete().await()
                 if (currentApartmentCode == accessCode) {
                     currentApartmentCode = null
                     _adminApartmentData.value = Resource.Success(null)
                 }
                 onSuccess()
+            } catch (e: Exception) {
+                onError(e.message ?: "Greška pri brisanju")
             }
-            .addOnFailureListener { onError(it.message ?: "Greška pri brisanju") }
+        }
     }
 
     fun addPlace(rec: Recommendation) {
         val code = currentApartmentCode ?: return
         val newDocRef = db.collection("apartments").document(code).collection("recommendations").document()
         val newRec = rec.copy(id = newDocRef.id, apartmentCode = code)
-        newDocRef.set(newRec)
+        viewModelScope.launch {
+            try {
+                newDocRef.set(newRec).await()
+            } catch (e: Exception) {
+                Log.e("Firebase", "Greška pri dodavanju preporuke", e)
+            }
+        }
     }
 
     fun updatePlace(rec: Recommendation) {
         val code = currentApartmentCode ?: return
-        db.collection("apartments").document(code).collection("recommendations").document(rec.id).set(rec)
+        viewModelScope.launch {
+            try {
+                db.collection("apartments").document(code)
+                    .collection("recommendations").document(rec.id).set(rec).await()
+            } catch (e: Exception) {
+                Log.e("Firebase", "Greška pri izmjeni preporuke", e)
+            }
+        }
     }
 
     fun deletePlace(id: String) {
         val code = currentApartmentCode ?: return
-        db.collection("apartments").document(code).collection("recommendations").document(id).delete()
+        viewModelScope.launch {
+            try {
+                db.collection("apartments").document(code)
+                    .collection("recommendations").document(id).delete().await()
+            } catch (e: Exception) {
+                Log.e("Firebase", "Greška pri brisanju preporuke", e)
+            }
+        }
     }
 
     fun addContact(contact: Contact) {
         val code = currentApartmentCode ?: return
         val newDocRef = db.collection("apartments").document(code).collection("contacts").document()
         val newContact = contact.copy(id = newDocRef.id)
-        newDocRef.set(newContact)
+        viewModelScope.launch {
+            try {
+                newDocRef.set(newContact).await()
+            } catch (e: Exception) {
+                Log.e("Firebase", "Greška pri dodavanju kontakta", e)
+            }
+        }
     }
 
     fun updateContact(contact: Contact) {
         val code = currentApartmentCode ?: return
-        db.collection("apartments").document(code).collection("contacts").document(contact.id).set(contact)
+        viewModelScope.launch {
+            try {
+                db.collection("apartments").document(code)
+                    .collection("contacts").document(contact.id).set(contact).await()
+            } catch (e: Exception) {
+                Log.e("Firebase", "Greška pri izmjeni kontakta", e)
+            }
+        }
     }
 
     fun deleteContact(contact: Contact) {
         val code = currentApartmentCode ?: return
-        db.collection("apartments").document(code).collection("contacts").document(contact.id).delete()
+        viewModelScope.launch {
+            try {
+                db.collection("apartments").document(code)
+                    .collection("contacts").document(contact.id).delete().await()
+            } catch (e: Exception) {
+                Log.e("Firebase", "Greška pri brisanju kontakta", e)
+            }
+        }
     }
 
+    // Čišćenje svih listenera kad se ViewModel uništi (izbjegava memory leak i curenje Firestore reads)
     override fun onCleared() {
         super.onCleared()
         apartmentListener?.remove()
         recListener?.remove()
         contactListener?.remove()
+        apartmentsListListener?.remove()
     }
 }

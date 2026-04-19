@@ -13,6 +13,9 @@ import com.bumptech.glide.Glide
 import com.example.guestguide.data.model.Recommendation
 import com.example.guestguide.databinding.ItemRecommendationBinding
 
+// Adapter za prikaz preporuka u RecyclerView-u (koristi se i na admin i na guest ekranima).
+// isAdmin flag kontroliše da li se prikazuju dugmad za brisanje i uređivanje.
+// Koristi ListAdapter + DiffUtil za efikasno ažuriranje liste.
 class RecommendationAdapter(
     private val isAdmin: Boolean,
     private val onDeleteClick: (String) -> Unit,
@@ -49,6 +52,7 @@ class RecommendationAdapter(
                 binding.ivPlaceImage.scaleType = android.widget.ImageView.ScaleType.CENTER
             }
 
+            // Klik na karticu otvara lokaciju u mapi (ako postoji link)
             binding.root.setOnClickListener {
                 if (item.mapLink.isNotEmpty()) {
                     try {
@@ -62,7 +66,7 @@ class RecommendationAdapter(
                 }
             }
 
-            // admin logika
+            // Admin vidi dugmad za brisanje/uređivanje, gost ne
             if (isAdmin) {
                 binding.btnDelete.visibility = View.VISIBLE
                 binding.btnEdit.visibility = View.VISIBLE

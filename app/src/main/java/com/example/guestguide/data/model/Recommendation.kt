@@ -1,5 +1,7 @@
 package com.example.guestguide.data.model
 
+// Preporuka za goste — restoran, bar, vinarija, znamenitost itd.
+// Čuva se kao sub-kolekcija unutar apartmana na Firestore-u.
 data class Recommendation(
     val id: String = "",
     val apartmentCode: String = "",

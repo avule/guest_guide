@@ -12,6 +12,8 @@ import com.example.guestguide.R
 import com.example.guestguide.databinding.FragmentAdminLoginBinding
 import com.example.guestguide.viewmodel.SharedViewModel
 
+// Ekran za prijavu/registraciju vlasnika apartmana putem Firebase Auth.
+// Isti ekran služi za oba moda — prebacivanje preko isLoginMode flaga.
 class AdminLoginFragment : Fragment() {
 
     private var _binding: FragmentAdminLoginBinding? = null
@@ -43,11 +45,13 @@ class AdminLoginFragment : Fragment() {
             findNavController().popBackStack()
         }
 
+        // Prebacivanje između login i registracija moda
         binding.btnSwitchMode.setOnClickListener {
             isLoginMode = !isLoginMode
             updateUI()
         }
 
+        // Validacija i slanje podataka na Firebase (login ili registracija)
         binding.btnMainAction.setOnClickListener {
             val email = binding.etEmail.text.toString().trim()
             val pass = binding.etPassword.text.toString().trim()
@@ -90,6 +94,7 @@ class AdminLoginFragment : Fragment() {
         }
     }
 
+    // Ažurira UI elemente zavisno od toga da li je login ili registracija mod
     private fun updateUI() {
         if (isLoginMode) {
             binding.tvTitle.text = "Prijava za vlasnika"

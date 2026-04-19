@@ -18,6 +18,8 @@ import com.example.guestguide.ui.adapter.RecommendationAdapter
 import com.example.guestguide.viewmodel.SharedViewModel
 import kotlinx.coroutines.launch
 
+// Ekran za istraživanje preporuka — gost može filtrirati po kategoriji i pretraživati po tekstu.
+// Podaci dolaze iz SharedViewModel-a koji ih vuče iz Firestore sub-kolekcije apartmana.
 class GuestExploreFragment : Fragment() {
 
     private var _binding: FragmentGuestExploreBinding? = null
@@ -26,7 +28,7 @@ class GuestExploreFragment : Fragment() {
     private val viewModel: SharedViewModel by activityViewModels()
     private lateinit var adapter: RecommendationAdapter
 
-    private var fullList: List<Recommendation> = emptyList()
+    private var fullList: List<Recommendation> = emptyList() // kompletna lista prije filtriranja
 
     private var currentCategory = "Sve"
 
@@ -54,6 +56,7 @@ class GuestExploreFragment : Fragment() {
             findNavController().popBackStack()
         }
 
+        // Filtriranje po kategoriji putem Chip dugmadi (Hrana, Piće, Vinarija, Znamenitost)
         binding.chipGroup.setOnCheckedStateChangeListener { _, checkedIds ->
             if (checkedIds.isNotEmpty()) {
                 currentCategory = when (checkedIds[0]) {
@@ -68,6 +71,7 @@ class GuestExploreFragment : Fragment() {
             }
         }
 
+        // Pretraga po imenu ili opisu preporuke u realnom vremenu
         binding.etSearch.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) {
                 applyFilters()
@@ -77,6 +81,7 @@ class GuestExploreFragment : Fragment() {
         })
     }
 
+    // Kombinuje kategorijski filter i tekstualnu pretragu, pa ažurira listu
     private fun applyFilters() {
         val query = binding.etSearch.text.toString().trim()
 

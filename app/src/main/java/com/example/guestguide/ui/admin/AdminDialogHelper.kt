@@ -26,6 +26,8 @@ import com.example.guestguide.data.model.Recommendation
 import com.example.guestguide.viewmodel.SharedViewModel
 import com.google.android.material.card.MaterialCardView
 
+// Pomoćna klasa koja centralizuje sve admin dijaloge na jednom mestu.
+// Svaki dialog se registruje u activeDialogs listu radi čišćenja pri uništavanju fragmenta.
 class AdminDialogHelper(
     private val fragment: Fragment,
     private val viewModel: SharedViewModel,
@@ -49,6 +51,7 @@ class AdminDialogHelper(
         activeDialogs.clear()
     }
 
+    // ---- Bočni meni (profil, odjava) ----
     fun showSideMenu() {
         val dialog = trackDialog(android.app.Dialog(requireContext()))
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -79,6 +82,7 @@ class AdminDialogHelper(
         dialog.show()
     }
 
+    // ---- Dijalog za promjenu email-a i lozinke (zahtijeva re-autentifikaciju) ----
     fun showEditProfileDialog() {
         val dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_edit_profile, null)
         val etCurrentPass = dialogView.findViewById<EditText>(R.id.etCurrentPass)
@@ -124,6 +128,7 @@ class AdminDialogHelper(
         dialog.show()
     }
 
+    // ---- Dijalog za dodavanje/uređivanje preporuke (CRUD) ----
     fun showAddPlaceDialog(recToEdit: Recommendation?, currentCode: String) {
         val dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_add_recommendation, null)
 
@@ -198,6 +203,7 @@ class AdminDialogHelper(
         dialog.show()
     }
 
+    // ---- Dijalog za izbor apartmana (lista svih apartmana vlasnika) ----
     fun showApartmentSelectionDialog(myApartments: List<Apartment>) {
         val dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_my_apartments, null)
 
@@ -288,6 +294,7 @@ class AdminDialogHelper(
         dialog.show()
     }
 
+    // ---- Dijalog za dodavanje/uređivanje kontakta (CRUD) ----
     fun showAddContactDialog(contactToEdit: Contact?) {
         val dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_add_contact, null)
         val etName = dialogView.findViewById<EditText>(R.id.etName)
@@ -354,6 +361,7 @@ class AdminDialogHelper(
         dialog.show()
     }
 
+    // ---- Potvrda brisanja preporuke ----
     fun confirmDelete(id: String) {
         val dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_delete_confirmation, null)
         val dialog = trackDialog(AlertDialog.Builder(requireContext())

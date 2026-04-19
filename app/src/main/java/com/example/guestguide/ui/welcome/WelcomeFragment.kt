@@ -13,6 +13,8 @@ import com.example.guestguide.R
 import com.example.guestguide.databinding.FragmentWelcomeBinding
 import com.example.guestguide.viewmodel.SharedViewModel
 
+// Početni ekran — gost unosi pristupni kod apartmana, admin ide na login.
+// Pristupni kod se provjerava u Firestore bazi prije navigacije.
 class WelcomeFragment : Fragment() {
 
     private var _binding: FragmentWelcomeBinding? = null
@@ -36,6 +38,7 @@ class WelcomeFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        // Gost unosi kod i prelazi na GuestHome ako apartman postoji
         binding.btnEnter.setOnClickListener {
             val code = binding.etCode.text.toString().uppercase().trim()
 
@@ -49,7 +52,8 @@ class WelcomeFragment : Fragment() {
                     if (exists) {
                         prefs.edit().putString("last_access_code", code).apply()
                         viewModel.connectToApartment(code)
-                        findNavController().navigate(R.id.action_welcome_to_guest)
+                        val action = WelcomeFragmentDirections.actionWelcomeToGuest(code)
+                        findNavController().navigate(action)
                     } else {
                         binding.btnEnter.isEnabled = true
                         binding.btnEnter.text = "PRISTUPI"
@@ -61,6 +65,7 @@ class WelcomeFragment : Fragment() {
             }
         }
 
+        // Link za vlasnika apartmana — vodi na AdminLogin
         binding.tvAdminLogin.setOnClickListener {
             findNavController().navigate(R.id.action_welcome_to_admin)
         }

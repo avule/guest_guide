@@ -41,6 +41,11 @@
         android:name="com.example.guestguide.ui.guest.GuestHomeFragment"
         android:label="Guest Home" >
 
+        <!-- Pristupni kod apartmana — proslijeđuje se iz WelcomeFragment putem SafeArgs -->
+        <argument
+            android:name="accessCode"
+            app:argType="string" />
+
         <action
             android:id="@+id/action_guest_home_to_explore"
             app:destination="@id/guestExploreFragment" />

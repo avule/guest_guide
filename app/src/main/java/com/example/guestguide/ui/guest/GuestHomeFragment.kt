@@ -14,6 +14,7 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
+import androidx.navigation.fragment.navArgs
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
 import com.example.guestguide.BuildConfig
@@ -24,12 +25,15 @@ import com.example.guestguide.utils.Resource
 import com.example.guestguide.viewmodel.SharedViewModel
 import kotlinx.coroutines.launch
 
+// Početni ekran za goste — prikazuje info o apartmanu: WiFi, pravila, lokaciju, kontakte.
+// Podaci dolaze real-time iz Firestore-a putem SharedViewModel-a.
 class GuestHomeFragment : Fragment() {
 
     private var _binding: FragmentGuestHomeBinding? = null
     private val binding get() = _binding!!
 
     private val viewModel: SharedViewModel by activityViewModels()
+    private val args: GuestHomeFragmentArgs by navArgs()
     private lateinit var contactsAdapter: ContactsAdapter
 
     override fun onCreateView(
@@ -42,10 +46,14 @@ class GuestHomeFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        // Idempotentno — vraća odmah ako je već konektovano.
+        // Bitno kod process death-a: ViewModel je prazan, SafeArg preživljava.
+        viewModel.connectToApartment(args.accessCode)
         setupUI()
         setupObservers()
     }
 
+    // -- Postavljanje klik listenera i RecyclerView-a za kontakte --
     private fun setupUI() {
         binding.ivExit.setOnClickListener {
             findNavController().popBackStack()
@@ -58,6 +66,7 @@ class GuestHomeFragment : Fragment() {
             }
         }
 
+        // Navigacija ka ekranu sa preporukama (restorani, znamenitosti...)
         binding.btnExplore.setOnClickListener {
             try {
                 findNavController().navigate(R.id.action_guest_home_to_explore)
@@ -66,6 +75,7 @@ class GuestHomeFragment : Fragment() {
             }
         }
 
+        // Poziv vlasnika apartmana direktno iz aplikacije
         binding.cardContactOwner.setOnClickListener {
             val resource = viewModel.adminApartmentData.value
             if (resource is Resource.Success) {
@@ -78,7 +88,7 @@ class GuestHomeFragment : Fragment() {
             }
         }
 
-        // Klik na mapu
+        // Otvaranje lokacije u Google Maps aplikaciji (ili web fallback)
         binding.cardMap.setOnClickListener {
             val resource = viewModel.adminApartmentData.value
             if (resource is Resource.Success) {
@@ -108,6 +118,7 @@ class GuestHomeFragment : Fragment() {
         }
     }
 
+    // -- Osluškivanje podataka o apartmanu i kontaktima iz Firestore-a --
     private fun setupObservers() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.adminApartmentData.collect { resource ->
@@ -138,10 +149,10 @@ class GuestHomeFragment : Fragment() {
                                 binding.tvRules.text = "Nema posebnih pravila."
                             }
 
+                            // Statička mapa — Google Maps Static API prikazuje sliku lokacije
                             if (apartment.location.isNotEmpty()) {
                                 binding.cardMap.visibility = View.VISIBLE
                                 binding.tvLocationLabel.visibility = View.VISIBLE
-
 
                                 val encodedLocation = Uri.encode(apartment.location)
                                 val staticMapUrl = "https://maps.googleapis.com/maps/api/staticmap?center=$encodedLocation&zoom=15&size=600x300&maptype=roadmap&markers=color:red%7C$encodedLocation&key=${BuildConfig.MAPS_API_KEY}"

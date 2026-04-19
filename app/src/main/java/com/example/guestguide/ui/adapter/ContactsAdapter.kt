@@ -10,6 +10,8 @@ import com.example.guestguide.data.model.Contact
 import com.example.guestguide.data.model.ContactType
 import com.example.guestguide.databinding.ItemContactBinding
 
+// Adapter za horizontalnu listu kontakata (taxi, policija, hitna, ostalo).
+// Na guest ekranu klik poziva broj, na admin ekranu prikazuje i dugmad za brisanje/uređivanje.
 class ContactsAdapter(
     private val isAdmin: Boolean,
     private val onContactClick: (Contact) -> Unit,
