@@ -18,8 +18,8 @@ import com.example.guestguide.ui.adapter.RecommendationAdapter
 import com.example.guestguide.viewmodel.SharedViewModel
 import kotlinx.coroutines.launch
 
-// Ekran za istraživanje preporuka — gost može filtrirati po kategoriji i pretraživati po tekstu.
-// Podaci dolaze iz SharedViewModel-a koji ih vuče iz Firestore sub-kolekcije apartmana.
+// Ekran sa preporukama. Ima filter po kategoriji i pretragu po tekstu.
+// Preporuke dolaze iz SharedViewModel-a (sub-kolekcija apartmana u Firestore-u).
 class GuestExploreFragment : Fragment() {
 
     private var _binding: FragmentGuestExploreBinding? = null
@@ -28,8 +28,10 @@ class GuestExploreFragment : Fragment() {
     private val viewModel: SharedViewModel by activityViewModels()
     private lateinit var adapter: RecommendationAdapter
 
-    private var fullList: List<Recommendation> = emptyList() // kompletna lista prije filtriranja
+    // Sve preporuke prije filtriranja. Drzimo ih lokalno da pretraga ide instant, bez poziva baze.
+    private var fullList: List<Recommendation> = emptyList()
 
+    // Trenutno izabran chip (kategorija).
     private var currentCategory = "Sve"
 
     override fun onCreateView(
@@ -45,6 +47,7 @@ class GuestExploreFragment : Fragment() {
 
         setupRecyclerView()
 
+        // Pretplati se na flow preporuka. Kad stignu novi podaci, filtriraj iznova.
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.recommendations.collect { list ->
                 fullList = list
@@ -56,7 +59,7 @@ class GuestExploreFragment : Fragment() {
             findNavController().popBackStack()
         }
 
-        // Filtriranje po kategoriji putem Chip dugmadi (Hrana, Piće, Vinarija, Znamenitost)
+        // Chip-ovi za kategorije: Sve, Hrana, Piće, Vinarija, Znamenitost.
         binding.chipGroup.setOnCheckedStateChangeListener { _, checkedIds ->
             if (checkedIds.isNotEmpty()) {
                 currentCategory = when (checkedIds[0]) {
@@ -71,7 +74,7 @@ class GuestExploreFragment : Fragment() {
             }
         }
 
-        // Pretraga po imenu ili opisu preporuke u realnom vremenu
+        // Pretraga preko TextWatcher-a. Okida applyFilters na svaku promjenu teksta.
         binding.etSearch.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) {
                 applyFilters()
@@ -81,7 +84,7 @@ class GuestExploreFragment : Fragment() {
         })
     }
 
-    // Kombinuje kategorijski filter i tekstualnu pretragu, pa ažurira listu
+    // Primjeni i kategorijski filter i tekst pretragu, pa salji rezultat u adapter.
     private fun applyFilters() {
         val query = binding.etSearch.text.toString().trim()
 

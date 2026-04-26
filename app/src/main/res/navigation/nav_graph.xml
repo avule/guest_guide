@@ -8,7 +8,7 @@
         android:id="@+id/welcomeFragment"
         android:name="com.example.guestguide.ui.welcome.WelcomeFragment"
         android:label="Welcome" >
-        <!-- Sada vodi na Login umesto direktno na Setup -->
+        <!-- ide na login prvo, ne direktno na setup -->
         <action
             android:id="@+id/action_welcome_to_admin"
             app:destination="@id/adminLoginFragment" />
@@ -17,14 +17,13 @@
             app:destination="@id/guestHomeFragment" />
     </fragment>
 
-    <!-- NOVI FRAGMENT: Admin Login -->
+    <!-- admin login ekran -->
     <fragment
         android:id="@+id/adminLoginFragment"
         android:name="com.example.guestguide.ui.admin.AdminLoginFragment"
         android:label="Admin Login" >
 
-        <!-- Akcija za prelazak na Setup nakon uspešnog logina -->
-        <!-- popUpTo="@id/welcomeFragment" znači da Back dugme vraća na početak, a ne na Login -->
+        <!-- nakon logina back dugme preskace login i vraca na welcome -->
         <action
             android:id="@+id/action_login_to_setup"
             app:destination="@id/adminSetupFragment"
@@ -41,7 +40,7 @@
         android:name="com.example.guestguide.ui.guest.GuestHomeFragment"
         android:label="Guest Home" >
 
-        <!-- Pristupni kod apartmana — proslijeđuje se iz WelcomeFragment putem SafeArgs -->
+        <!-- salje accessCode iz welcome ekrana -->
         <argument
             android:name="accessCode"
             app:argType="string" />

@@ -22,8 +22,8 @@ import com.example.guestguide.utils.Resource
 import com.example.guestguide.viewmodel.SharedViewModel
 import kotlinx.coroutines.launch
 
-// Glavni admin panel — vlasnik ovdje upravlja apartmanima, preporukama i kontaktima.
-// Podržava kreiranje novog i uređivanje postojećeg apartmana. Svi podaci idu na Firestore.
+// Glavni admin panel. Vlasnik ovdje upravlja apartmanima, preporukama i kontaktima.
+// Moze da kreira novi apartman ili da edituje postojeci. Sve podatke salje na Firestore.
 class AdminSetupFragment : Fragment() {
 
     private var _binding: FragmentAdminSetupBinding? = null
@@ -47,12 +47,13 @@ class AdminSetupFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Ako korisnik nije ulogovan, vrati ga na login
+        // Bez logina nema pristupa setup ekranu.
         if (viewModel.getCurrentUser() == null) {
             findNavController().navigate(R.id.adminLoginFragment)
             return
         }
 
+        // Pokreni real-time listener na sve apartmane vlasnika.
         viewModel.loadUserApartments()
 
         dialogHelper = AdminDialogHelper(
@@ -66,13 +67,15 @@ class AdminSetupFragment : Fragment() {
         setupRecyclerView()
         observeData()
 
-        // -- Dugmad za akcije --
+        // ----- DUGMAD I KLIKOVI -----
+
+        // Back strelica vraca na welcome ekran. Admin ostaje ulogovan.
         binding.ivBack.setOnClickListener {
             findNavController().popBackStack(R.id.welcomeFragment, false)
         }
         binding.btnSaveAndGenerate.setOnClickListener { saveApartmentData() }
 
-        // Dodavanje preporuke ili kontakta (mora prvo apartman biti sačuvan)
+        // Za dodavanje preporuke ili kontakta apartman mora vec biti sacuvan.
         binding.btnAddPlace.setOnClickListener {
             if (viewModel.existingAccessCode == null) {
                 Toast.makeText(context, "Sačuvajte apartman prvo!", Toast.LENGTH_SHORT).show()
@@ -115,7 +118,7 @@ class AdminSetupFragment : Fragment() {
         Toast.makeText(context, "Kod kopiran!", Toast.LENGTH_SHORT).show()
     }
 
-    // -- Inicijalizacija RecyclerView-ova za preporuke i kontakte --
+    // Postavlja oba RecyclerView-a. Preporuke idu vertikalno, kontakti horizontalno.
     private fun setupRecyclerView() {
         adapter = RecommendationAdapter(
             isAdmin = true,
@@ -147,8 +150,9 @@ class AdminSetupFragment : Fragment() {
         }
     }
 
-    // -- Osluškivanje podataka iz ViewModela (Firestore real-time) --
+    // Sluša 4 StateFlow-a iz ViewModela i ažurira UI cim stignu novi podaci.
     private fun observeData() {
+        // Glavni flow. Vraca apartman zajedno sa Loading/Success/Error stanjem.
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.adminApartmentData.collect { resource ->
                 when (resource) {
@@ -196,15 +200,17 @@ class AdminSetupFragment : Fragment() {
             }
         }
 
+        // Preporuke i kontakti idu direktno u svoje adaptere.
         viewLifecycleOwner.lifecycleScope.launch { viewModel.recommendations.collect { adapter.submitList(it) } }
         viewLifecycleOwner.lifecycleScope.launch { viewModel.contacts.collect { contactsAdapter.submitList(it) } }
 
+        // Lista svih apartmana vlasnika. Treba nam za dialog izbora apartmana.
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.ownedApartments.collect { list -> myApartments = list }
         }
     }
 
-    // Resetuje formu i priprema UI za kreiranje potpuno novog apartmana
+    // Resetuje formu i sprema UI za kreiranje potpuno novog apartmana.
     private fun createNewApartmentMode() {
         viewModel.isCreatingNew = true
         viewModel.existingAccessCode = null
@@ -228,7 +234,7 @@ class AdminSetupFragment : Fragment() {
         contactsAdapter.submitList(emptyList())
     }
 
-    // Čuva podatke apartmana u Firestore — kreira novi ili ažurira postojeći
+    // Skuplja podatke iz forme, validira ih i salje u ViewModel.
     private fun saveApartmentData() {
         val name = binding.etApartmentName.text.toString()
         val location = binding.etLocation.text.toString()
@@ -272,7 +278,7 @@ class AdminSetupFragment : Fragment() {
         Toast.makeText(context, "Uspješno sačuvano!", Toast.LENGTH_SHORT).show()
     }
 
-    // Generiše nasumični 6-cifreni pristupni kod za novi apartman
+    // 6 nasumicnih karaktera. Postaje istovremeno i document ID i pristupni kod.
     private fun generateRandomCode(): String {
         return (1..6).map { "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".random() }.joinToString("")
     }

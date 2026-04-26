@@ -3,18 +3,18 @@ package com.example.guestguide
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 
-// Jedina aktivnost u aplikaciji — koristi Navigation Component za upravljanje fragmentima.
-// Svi ekrani (Welcome, Admin, Guest) su fragmenti unutar NavHostFragment-a.
+// Jedina Activity u aplikaciji. Drzi NavHostFragment unutar layout-a.
+// Svi ekrani (Welcome, Admin, Guest) su fragmenti.
 class MainActivity : AppCompatActivity() {
 
     companion object {
-        // Sprečava ponovni restore stanja pri procesnom restartu
+        // Sluzi da razlikujemo rotaciju ekrana od potpunog restarta procesa.
         private var isProcessRunning = false
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Na svježem startu procesa ignorišemo savedInstanceState da Navigation Component
-        // ne restaurira prethodni back stack. Na rotaciji (isProcessRunning == true) čuvamo stanje.
+        // Ako je proces tek startovan, ignorisemo stari state da Navigation
+        // ne pokusa da vrati back stack koji vise nema smisla.
         val effectiveState = if (isProcessRunning) savedInstanceState else null
         super.onCreate(effectiveState)
         setContentView(R.layout.activity_main)

@@ -26,8 +26,8 @@ import com.example.guestguide.data.model.Recommendation
 import com.example.guestguide.viewmodel.SharedViewModel
 import com.google.android.material.card.MaterialCardView
 
-// Pomoćna klasa koja centralizuje sve admin dijaloge na jednom mestu.
-// Svaki dialog se registruje u activeDialogs listu radi čišćenja pri uništavanju fragmenta.
+// Pomocna klasa. Sve admin dialoge drzimo ovdje, ne u samom Fragment-u, da bi kod bio cistiji.
+// activeDialogs lista nam omogucava da ih sve pogasimo kad fragment ode.
 class AdminDialogHelper(
     private val fragment: Fragment,
     private val viewModel: SharedViewModel,
@@ -35,23 +35,26 @@ class AdminDialogHelper(
     private val onCreateNewApartment: () -> Unit
 ) {
 
+    // Lista svih trenutno otvorenih dialoga. Bitna je za izbjegavanje WindowLeaked greske.
     private val activeDialogs = mutableListOf<android.app.Dialog>()
 
     private val context get() = fragment.context
     private fun requireContext() = fragment.requireContext()
 
+    // Ubaci dialog u listu i automatski ga skini kad se zatvori.
     private fun trackDialog(dialog: android.app.Dialog): android.app.Dialog {
         activeDialogs.add(dialog)
         dialog.setOnDismissListener { activeDialogs.remove(dialog) }
         return dialog
     }
 
+    // Gasi sve otvorene dialoge. Zove se iz Fragment.onDestroyView().
     fun dismissAll() {
         activeDialogs.toList().forEach { if (it.isShowing) it.dismiss() }
         activeDialogs.clear()
     }
 
-    // ---- Bočni meni (profil, odjava) ----
+    // ----- BOCNI MENI (profil + odjava) -----
     fun showSideMenu() {
         val dialog = trackDialog(android.app.Dialog(requireContext()))
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -82,7 +85,8 @@ class AdminDialogHelper(
         dialog.show()
     }
 
-    // ---- Dijalog za promjenu email-a i lozinke (zahtijeva re-autentifikaciju) ----
+    // ----- IZMJENA PROFILA -----
+    // Mijenja email i/ili lozinku. Trazi unos trenutne lozinke radi re-autentifikacije.
     fun showEditProfileDialog() {
         val dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_edit_profile, null)
         val etCurrentPass = dialogView.findViewById<EditText>(R.id.etCurrentPass)
@@ -113,9 +117,19 @@ class AdminDialogHelper(
             btnSave.isEnabled = false
             btnSave.text = "Čuvanje..."
 
+            // Provjera da li korisnik zaista mijenja email.
+            val emailChanged = newEmail.isNotEmpty() && newEmail != viewModel.getUserEmail()
+
             viewModel.updateProfile(currentPass, newEmail, newPass,
                 onSuccess = {
-                    Toast.makeText(context, "Profil uspješno ažuriran!", Toast.LENGTH_SHORT).show()
+                    // Firebase email change zahtijeva klik na verifikacioni link u novom inbox-u.
+                    // Lozinka se mijenja odmah.
+                    val msg = if (emailChanged) {
+                        "Verifikacioni link je poslan na $newEmail. Otvorite ga da potvrdite promjenu emaila."
+                    } else {
+                        "Profil uspješno ažuriran!"
+                    }
+                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                     dialog.dismiss()
                 },
                 onError = { error ->
@@ -128,7 +142,8 @@ class AdminDialogHelper(
         dialog.show()
     }
 
-    // ---- Dijalog za dodavanje/uređivanje preporuke (CRUD) ----
+    // ----- DODAJ ILI IZMJENI PREPORUKU -----
+    // Ako je recToEdit null, otvara se forma za kreiranje. Inace ide izmjena.
     fun showAddPlaceDialog(recToEdit: Recommendation?, currentCode: String) {
         val dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_add_recommendation, null)
 
@@ -203,7 +218,8 @@ class AdminDialogHelper(
         dialog.show()
     }
 
-    // ---- Dijalog za izbor apartmana (lista svih apartmana vlasnika) ----
+    // ----- IZBOR APARTMANA -----
+    // Prikazuje listu svih apartmana vlasnika. Ima i dugme za brisanje.
     fun showApartmentSelectionDialog(myApartments: List<Apartment>) {
         val dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_my_apartments, null)
 
@@ -229,6 +245,7 @@ class AdminDialogHelper(
             tvName.text = apt.name
             tvCode.text = "KOD: ${apt.accessCode}"
 
+            // Istakni karticu trenutno aktivnog apartmana zlatnim okvirom.
             if (apt.accessCode == viewModel.existingAccessCode) {
                 cardRoot.strokeColor = ContextCompat.getColor(requireContext(), R.color.gold_accent)
                 cardRoot.strokeWidth = 4
@@ -251,6 +268,7 @@ class AdminDialogHelper(
                 dialog.dismiss()
             }
 
+            // Brisanje apartmana. Uvijek prvo trazimo potvrdu.
             btnDelete.setOnClickListener {
                 AlertDialog.Builder(requireContext())
                     .setTitle("Obriši apartman?")
@@ -261,6 +279,7 @@ class AdminDialogHelper(
                                 Toast.makeText(context, "Apartman obrisan", Toast.LENGTH_SHORT).show()
                                 dialog.dismiss()
 
+                                // Ako jos ima apartmana, prebaci se na prvi. Inace pokreni mod za novi.
                                 val remainingApartments = myApartments.filter { it.accessCode != apt.accessCode }
 
                                 if (remainingApartments.isNotEmpty()) {
@@ -294,7 +313,7 @@ class AdminDialogHelper(
         dialog.show()
     }
 
-    // ---- Dijalog za dodavanje/uređivanje kontakta (CRUD) ----
+    // ----- DODAJ ILI IZMJENI KONTAKT -----
     fun showAddContactDialog(contactToEdit: Contact?) {
         val dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_add_contact, null)
         val etName = dialogView.findViewById<EditText>(R.id.etName)
@@ -361,7 +380,7 @@ class AdminDialogHelper(
         dialog.show()
     }
 
-    // ---- Potvrda brisanja preporuke ----
+    // ----- POTVRDA BRISANJA PREPORUKE -----
     fun confirmDelete(id: String) {
         val dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_delete_confirmation, null)
         val dialog = trackDialog(AlertDialog.Builder(requireContext())

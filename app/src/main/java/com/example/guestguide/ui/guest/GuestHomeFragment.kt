@@ -25,8 +25,8 @@ import com.example.guestguide.utils.Resource
 import com.example.guestguide.viewmodel.SharedViewModel
 import kotlinx.coroutines.launch
 
-// Početni ekran za goste — prikazuje info o apartmanu: WiFi, pravila, lokaciju, kontakte.
-// Podaci dolaze real-time iz Firestore-a putem SharedViewModel-a.
+// Gostov pocetni ekran. Prikazuje wifi, pravila, mapu i kontakte.
+// Podatke dobija real-time iz Firestore-a kroz SharedViewModel.
 class GuestHomeFragment : Fragment() {
 
     private var _binding: FragmentGuestHomeBinding? = null
@@ -46,19 +46,20 @@ class GuestHomeFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        // Idempotentno — vraća odmah ako je već konektovano.
-        // Bitno kod process death-a: ViewModel je prazan, SafeArg preživljava.
+        // accessCode dolazi iz SafeArgs. Bitno ako OS ubije proces pa se ViewModel resetuje.
+        // Funkcija je idempotentna. Ako vec slusamo isti kod, ne radi nista.
         viewModel.connectToApartment(args.accessCode)
         setupUI()
         setupObservers()
     }
 
-    // -- Postavljanje klik listenera i RecyclerView-a za kontakte --
+    // Postavlja klik listenere i horizontalnu listu kontakata.
     private fun setupUI() {
         binding.ivExit.setOnClickListener {
             findNavController().popBackStack()
         }
 
+        // Klik na lozinku je kopira u clipboard.
         binding.btnCopyWifi.setOnClickListener {
             val wifiPass = binding.tvWifiPass.text.toString()
             if (wifiPass.isNotEmpty() && wifiPass != "..." && wifiPass != "Učitavanje...") {
@@ -66,7 +67,7 @@ class GuestHomeFragment : Fragment() {
             }
         }
 
-        // Navigacija ka ekranu sa preporukama (restorani, znamenitosti...)
+        // Dugme ISTRAZI GRAD prelazi na ekran sa preporukama.
         binding.btnExplore.setOnClickListener {
             try {
                 findNavController().navigate(R.id.action_guest_home_to_explore)
@@ -75,7 +76,7 @@ class GuestHomeFragment : Fragment() {
             }
         }
 
-        // Poziv vlasnika apartmana direktno iz aplikacije
+        // Klik na karticu vlasnika otvara dialer sa njegovim brojem.
         binding.cardContactOwner.setOnClickListener {
             val resource = viewModel.adminApartmentData.value
             if (resource is Resource.Success) {
@@ -88,7 +89,7 @@ class GuestHomeFragment : Fragment() {
             }
         }
 
-        // Otvaranje lokacije u Google Maps aplikaciji (ili web fallback)
+        // Klik na mapu otvara Google Maps app. Ako app nije instaliran, ide preko web pretrage.
         binding.cardMap.setOnClickListener {
             val resource = viewModel.adminApartmentData.value
             if (resource is Resource.Success) {
@@ -118,7 +119,7 @@ class GuestHomeFragment : Fragment() {
         }
     }
 
-    // -- Osluškivanje podataka o apartmanu i kontaktima iz Firestore-a --
+    // Slusa dva StateFlow-a (apartman i kontakti) i ažurira UI cim stignu novi podaci.
     private fun setupObservers() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.adminApartmentData.collect { resource ->
@@ -138,6 +139,7 @@ class GuestHomeFragment : Fragment() {
                             binding.tvWifiSsid.text = apartment.wifiSsid
                             binding.tvWifiPass.text = apartment.wifiPassword
 
+                            // Formatiraj kucna pravila tako da svaki red postaje bullet stavka.
                             if (apartment.houseRules.isNotEmpty()) {
                                 val lines = apartment.houseRules.split("\n")
                                 val formattedRules = lines
@@ -149,7 +151,7 @@ class GuestHomeFragment : Fragment() {
                                 binding.tvRules.text = "Nema posebnih pravila."
                             }
 
-                            // Statička mapa — Google Maps Static API prikazuje sliku lokacije
+                            // Mapu prikazujemo kao sliku preko Maps Static API-ja. Lakše nego puni Maps SDK.
                             if (apartment.location.isNotEmpty()) {
                                 binding.cardMap.visibility = View.VISIBLE
                                 binding.tvLocationLabel.visibility = View.VISIBLE
@@ -181,6 +183,7 @@ class GuestHomeFragment : Fragment() {
         }
     }
 
+    // Otvara dialer sa vec unesenim brojem. Ne poziva automatski, korisnik mora pritisnuti zeleno dugme.
     private fun dialNumber(phoneNumber: String) {
         if (phoneNumber.isEmpty()) return
         try {

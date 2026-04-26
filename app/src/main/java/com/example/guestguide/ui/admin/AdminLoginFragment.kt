@@ -12,15 +12,15 @@ import com.example.guestguide.R
 import com.example.guestguide.databinding.FragmentAdminLoginBinding
 import com.example.guestguide.viewmodel.SharedViewModel
 
-// Ekran za prijavu/registraciju vlasnika apartmana putem Firebase Auth.
-// Isti ekran služi za oba moda — prebacivanje preko isLoginMode flaga.
+// Login i registracija vlasnika kroz Firebase Auth.
+// Jedan layout sluzi za oba moda. Prebacujemo se preko isLoginMode flaga.
 class AdminLoginFragment : Fragment() {
 
     private var _binding: FragmentAdminLoginBinding? = null
     private val binding get() = _binding!!
     private val viewModel: SharedViewModel by activityViewModels()
 
-    // pratimo da li je trenutno ekran za login ili registraciju
+    // True znaci da je trenutno login mod, false znaci registracija.
     private var isLoginMode = true
 
     override fun onCreateView(
@@ -34,24 +34,29 @@ class AdminLoginFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // ako je korisnik već ulogovan idi odmah na setup
+        // Ako je vec ulogovan, preskoci login ekran. Return da se ostatak ne izvrsi.
         if (viewModel.getCurrentUser() != null) {
             findNavController().navigate(R.id.action_login_to_setup)
+            return
         }
 
         updateUI()
 
+        // Back strelica. Pokusaj popBackStack, a ako Welcome nije u istoriji onda fresh navigacija.
         binding.ivBack.setOnClickListener {
-            findNavController().popBackStack()
+            val popped = findNavController().popBackStack(R.id.welcomeFragment, false)
+            if (!popped) {
+                findNavController().navigate(R.id.welcomeFragment)
+            }
         }
 
-        // Prebacivanje između login i registracija moda
+        // Toggle izmedju login i registracija moda.
         binding.btnSwitchMode.setOnClickListener {
             isLoginMode = !isLoginMode
             updateUI()
         }
 
-        // Validacija i slanje podataka na Firebase (login ili registracija)
+        // Glavno dugme. Pokrece login ili registraciju zavisno od trenutnog moda.
         binding.btnMainAction.setOnClickListener {
             val email = binding.etEmail.text.toString().trim()
             val pass = binding.etPassword.text.toString().trim()
@@ -94,7 +99,7 @@ class AdminLoginFragment : Fragment() {
         }
     }
 
-    // Ažurira UI elemente zavisno od toga da li je login ili registracija mod
+    // Mijenja naslov, tekst dugmeta i prikaz polja zavisno od moda.
     private fun updateUI() {
         if (isLoginMode) {
             binding.tvTitle.text = "Prijava za vlasnika"

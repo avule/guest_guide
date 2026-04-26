@@ -19,26 +19,30 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-// Centralni ViewModel koji dijele svi fragmenti putem activityViewModels().
-// Sadrži svu poslovnu logiku: autentifikaciju, CRUD operacije i real-time Firestore listenere.
-// Fragmenti komuniciraju međusobno isključivo preko StateFlow-ova iz ovog ViewModela.
+// Centralni ViewModel. Svi fragmenti ga dobijaju preko activityViewModels().
+// Ovdje je sva logika: auth, CRUD, real-time slusanje Firestore baze.
+// Fragmenti razmjenjuju podatke iskljucivo preko StateFlow-ova ispod.
 class SharedViewModel(application: Application) : AndroidViewModel(application) {
 
+    // Firebase singleton.
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
+    // Kod trenutno aktivnog apartmana.
     private var currentApartmentCode: String? = null
 
-    // Admin UI stanje (preživljava rotaciju ekrana jer je u ViewModelu)
+    // Pomocno admin stanje koje preživljava rotaciju ekrana.
     var isCreatingNew: Boolean = false
     var existingAccessCode: String? = null
     var currentApartmentImageUrl: String = ""
 
+    // Real-time listeneri. Cuvamo ih da ih mozemo ugasiti i izbjeci leak.
     private var apartmentListener: ListenerRegistration? = null
     private var recListener: ListenerRegistration? = null
     private var contactListener: ListenerRegistration? = null
     private var apartmentsListListener: ListenerRegistration? = null
 
+    // StateFlow-ovi. Fragmenti se pretplate i automatski dobijaju nova stanja. Observer pattern
     private val _adminApartmentData = MutableStateFlow<Resource<Apartment?>>(Resource.Loading)
     val adminApartmentData: StateFlow<Resource<Apartment?>> = _adminApartmentData
 
@@ -51,9 +55,12 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
     private val _contacts = MutableStateFlow<List<Contact>>(emptyList())
     val contacts: StateFlow<List<Contact>> = _contacts
 
+    // ----- AUTH -----
+
     fun getCurrentUser() = auth.currentUser
     fun getUserEmail() = auth.currentUser?.email ?: ""
 
+    // Login preko emaila i lozinke.
     fun login(email: String, pass: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             try {
@@ -66,6 +73,7 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // Registracija novog vlasnika.
     fun register(email: String, pass: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             try {
@@ -77,6 +85,7 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // Odjava. Gasi sve listenere i prazni stanje.
     fun logout() {
         auth.signOut()
         apartmentsListListener?.remove()
@@ -86,6 +95,7 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         _ownedApartments.value = emptyList()
     }
 
+    // Gasi listenere za trenutno aktivan apartman. Listu svih apartmana ne dira.
     fun clearCurrentApartment() {
         currentApartmentCode = null
         apartmentListener?.remove()
@@ -95,8 +105,8 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         _recommendations.value = emptyList()
     }
 
-    // Promjena email-a i/ili lozinke — zahtijeva re-autentifikaciju sa trenutnom lozinkom.
-    // Ako su oba tražena, paralelno se izvršavaju preko async/awaitAll.
+    // Promjena emaila i/ili lozinke. Prvo se trazi re-auth sa starom lozinkom,
+    // pa onda paralelno oba update-a ako su oba trazena.
     fun updateProfile(currentPass: String, newEmail: String, newPass: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         val user = auth.currentUser
         if (user == null || user.email == null) {
@@ -134,7 +144,9 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    // Učitava sve apartmane vlasnika i automatski selektuje prvi ako nijedan nije izabran
+    // ----- APARTMANI: ucitavanje i konekcija -----
+
+    // Dovuce sve apartmane ulogovanog vlasnika i automatski selektuje prvi ako nema izabranog.
     fun loadUserApartments() {
         val userId = auth.currentUser?.uid ?: return
 
@@ -162,7 +174,7 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
     }
 
 
-    // Jednokratna provjera da li apartman postoji (za WelcomeFragment)
+    // Provjera postoji li apartman s tim kodom.
     fun verifyApartmentCode(code: String, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
             try {
@@ -174,7 +186,8 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    // Postavlja real-time listenere na apartman, preporuke i kontakte iz Firestore-a
+    // Kaci 3 listenera odjednom: apartman, recommendations, contacts.
+    // Funkcija je idempotentna. Ako vec slusamo isti kod, odmah vraca.
     fun connectToApartment(accessCode: String) {
         val currentState = _adminApartmentData.value
         if (currentApartmentCode == accessCode && currentState is Resource.Success) {
@@ -187,6 +200,7 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
             _adminApartmentData.value = Resource.Loading
         }
 
+        // 1. Listener na sam apartman.
         apartmentListener?.remove()
         apartmentListener = db.collection("apartments").document(accessCode)
             .addSnapshotListener { snapshot, e ->
@@ -203,6 +217,7 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
 
+        // 2. Listener na sub-kolekciju preporuka.
         recListener?.remove()
         recListener = db.collection("apartments").document(accessCode)
             .collection("recommendations")
@@ -212,6 +227,7 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
                 _recommendations.value = list
             }
 
+        // 3. Listener na sub-kolekciju kontakata.
         contactListener?.remove()
         contactListener = db.collection("apartments").document(accessCode)
             .collection("contacts")
@@ -222,7 +238,9 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
             }
     }
 
-    // Čuva novi ili ažurira postojeći apartman u Firestore-u
+    // ----- CRUD: APARTMAN -----
+
+    // Upisuje novi ili azurira postojeci apartman. Firestore set() radi oboje.
     fun saveApartmentSettings(apartment: Apartment) {
         _adminApartmentData.value = Resource.Loading
         val ownerId = auth.currentUser?.uid ?: ""
@@ -242,6 +260,7 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // Brise apartman. Subkolekcije ostaju u bazi dok ih rucno ne pocistimo.
     fun deleteApartment(accessCode: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             try {
@@ -257,6 +276,10 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // ----- CRUD: PREPORUKE -----
+
+    // Dodaje novu preporuku. Firestore generise ID, a mi ga upisemo u sam objekat
+    // da bi kasnije mogli da ga citamo prilikom edit/delete.
     fun addPlace(rec: Recommendation) {
         val code = currentApartmentCode ?: return
         val newDocRef = db.collection("apartments").document(code).collection("recommendations").document()
@@ -270,6 +293,7 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // Mijenja postojecu preporuku po ID-u.
     fun updatePlace(rec: Recommendation) {
         val code = currentApartmentCode ?: return
         viewModelScope.launch {
@@ -282,6 +306,7 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // Brise preporuku po ID-u.
     fun deletePlace(id: String) {
         val code = currentApartmentCode ?: return
         viewModelScope.launch {
@@ -294,6 +319,9 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // ----- CRUD: KONTAKTI -----
+
+    // Dodaje novi kontakt (taxi, policija, hitna i slicno).
     fun addContact(contact: Contact) {
         val code = currentApartmentCode ?: return
         val newDocRef = db.collection("apartments").document(code).collection("contacts").document()
@@ -307,6 +335,7 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // Mijenja postojeci kontakt.
     fun updateContact(contact: Contact) {
         val code = currentApartmentCode ?: return
         viewModelScope.launch {
@@ -319,6 +348,7 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // Brise kontakt.
     fun deleteContact(contact: Contact) {
         val code = currentApartmentCode ?: return
         viewModelScope.launch {
@@ -331,7 +361,8 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    // Čišćenje svih listenera kad se ViewModel uništi (izbjegava memory leak i curenje Firestore reads)
+    // Pred unistavanje ViewModel-a gasimo sve listenere.
+    // Bez ovoga bi memorija curila, a Firestore bi nastavio da naplacuje citanja.
     override fun onCleared() {
         super.onCleared()
         apartmentListener?.remove()

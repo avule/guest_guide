@@ -1,7 +1,7 @@
 package com.example.guestguide.utils
 
-// Omotač za rezultate async operacija — koristi se u ViewModelu i fragmentima
-// da se zna da li je podatak u procesu učitavanja, uspješan ili greška.
+// Omotac za rezultate async operacija. Postoje tri stanja: Loading, Success, Error.
+// Sealed klasa znaci da kompajler trazi da pokrijem sva tri stanja u when bloku.
 sealed class Resource<out T> {
     object Loading : Resource<Nothing>()
     data class Success<out T>(val data: T) : Resource<T>()
