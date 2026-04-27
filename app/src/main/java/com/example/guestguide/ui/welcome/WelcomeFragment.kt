@@ -38,6 +38,13 @@ class WelcomeFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        // Procitaj zadnji uneseni kod iz SharedPreferences i popuni polje.
+        // Ovako gost ne mora svaki put da kuca kod ako se vrati u aplikaciju.
+        val lastCode = prefs.getString("last_access_code", "")
+        if (!lastCode.isNullOrEmpty()) {
+            binding.etCode.setText(lastCode)
+        }
+
         // Gost je kliknuo PRISTUPI. Prvo provjeri kod u bazi, pa idi na GuestHome.
         binding.btnEnter.setOnClickListener {
             val code = binding.etCode.text.toString().uppercase().trim()

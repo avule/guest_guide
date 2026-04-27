@@ -1,7 +1,6 @@
 package com.example.guestguide.data.model
 
 // Vazan broj telefona za gosta. Moze biti taxi, policija, hitna ili nesto drugo.
-// Cuva se kao sub-kolekcija unutar apartmana: apartments/{accessCode}/contacts/{id}
 data class Contact(
     val id: String = "",
     val name: String = "",
