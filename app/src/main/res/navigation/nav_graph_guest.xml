@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph_guest"
+    app:startDestination="@id/guestHomeFragment">
+
+    <fragment
+        android:id="@+id/guestHomeFragment"
+        android:name="com.example.guestguide.ui.guest.GuestHomeFragment"
+        android:label="Guest Home" >
+
+        <!-- accessCode dolazi iz Intent extras-a, ali argument ostaje za SafeArgs -->
+        <argument
+            android:name="accessCode"
+            app:argType="string"
+            android:defaultValue="" />
+
+        <action
+            android:id="@+id/action_guest_home_to_explore"
+            app:destination="@id/guestExploreFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/guestExploreFragment"
+        android:name="com.example.guestguide.ui.guest.GuestExploreFragment"
+        android:label="Explore" />
+
+</navigation>

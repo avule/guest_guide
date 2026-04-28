@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph_admin"
+    app:startDestination="@id/adminLoginFragment">
+
+    <fragment
+        android:id="@+id/adminLoginFragment"
+        android:name="com.example.guestguide.ui.admin.AdminLoginFragment"
+        android:label="Admin Login" >
+
+        <!-- nakon logina preskoci login iz back stack-a -->
+        <action
+            android:id="@+id/action_login_to_setup"
+            app:destination="@id/adminSetupFragment"
+            app:popUpTo="@id/adminLoginFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/adminSetupFragment"
+        android:name="com.example.guestguide.ui.admin.AdminSetupFragment"
+        android:label="Admin Setup" />
+
+</navigation>

@@ -1,6 +1,7 @@
 package com.example.guestguide.ui.welcome
 
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -8,8 +9,8 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
-import androidx.navigation.fragment.findNavController
-import com.example.guestguide.R
+import com.example.guestguide.AdminActivity
+import com.example.guestguide.GuestActivity
 import com.example.guestguide.databinding.FragmentWelcomeBinding
 import com.example.guestguide.viewmodel.SharedViewModel
 
@@ -60,10 +61,13 @@ class WelcomeFragment : Fragment() {
                     if (exists) {
                         // Upamti kod za sljedeci put.
                         prefs.edit().putString("last_access_code", code).apply()
-                        viewModel.connectToApartment(code)
-                        // SafeArgs prosledjuje kod do GuestHome ekrana.
-                        val action = WelcomeFragmentDirections.actionWelcomeToGuest(code)
-                        findNavController().navigate(action)
+                        // Pokreni GuestActivity i prosledi kod kroz Intent extras.
+                        val intent = Intent(requireContext(), GuestActivity::class.java)
+                        intent.putExtra(GuestActivity.EXTRA_ACCESS_CODE, code)
+                        startActivity(intent)
+                        // Resetuj UI za slucaj da se korisnik vrati na ovaj ekran.
+                        binding.btnEnter.isEnabled = true
+                        binding.btnEnter.text = "PRISTUPI"
                     } else {
                         binding.btnEnter.isEnabled = true
                         binding.btnEnter.text = "PRISTUPI"
@@ -75,9 +79,9 @@ class WelcomeFragment : Fragment() {
             }
         }
 
-        // Link za vlasnika apartmana. Vodi na admin login.
+        // Link za vlasnika apartmana. Pokrece AdminActivity.
         binding.tvAdminLogin.setOnClickListener {
-            findNavController().navigate(R.id.action_welcome_to_admin)
+            startActivity(Intent(requireContext(), AdminActivity::class.java))
         }
     }
 

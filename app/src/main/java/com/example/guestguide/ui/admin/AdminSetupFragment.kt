@@ -47,9 +47,9 @@ class AdminSetupFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Bez logina nema pristupa setup ekranu.
+        // Bez logina nema pristupa setup ekranu. Vrati korisnika na login.
         if (viewModel.getCurrentUser() == null) {
-            findNavController().navigate(R.id.adminLoginFragment)
+            findNavController().popBackStack(R.id.adminLoginFragment, false)
             return
         }
 
@@ -60,7 +60,8 @@ class AdminSetupFragment : Fragment() {
             fragment = this,
             viewModel = viewModel,
             onNavigateToLogin = {
-                findNavController().navigate(R.id.adminLoginFragment)
+                // Logout zatvara cijelu AdminActivity. Korisnik se vraca na Welcome.
+                requireActivity().finish()
             },
             onCreateNewApartment = { createNewApartmentMode() }
         )
@@ -69,9 +70,9 @@ class AdminSetupFragment : Fragment() {
 
         // ----- DUGMAD I KLIKOVI -----
 
-        // Back strelica vraca na welcome ekran. Admin ostaje ulogovan.
+        // Back strelica zatvara AdminActivity i vraca korisnika na Welcome. Admin ostaje ulogovan.
         binding.ivBack.setOnClickListener {
-            findNavController().popBackStack(R.id.welcomeFragment, false)
+            requireActivity().finish()
         }
         binding.btnSaveAndGenerate.setOnClickListener { saveApartmentData() }
 

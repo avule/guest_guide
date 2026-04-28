@@ -42,12 +42,9 @@ class AdminLoginFragment : Fragment() {
 
         updateUI()
 
-        // Back strelica. Pokusaj popBackStack, a ako Welcome nije u istoriji onda fresh navigacija.
+        // Back strelica zatvara cijelu AdminActivity i vraca korisnika na Welcome.
         binding.ivBack.setOnClickListener {
-            val popped = findNavController().popBackStack(R.id.welcomeFragment, false)
-            if (!popped) {
-                findNavController().navigate(R.id.welcomeFragment)
-            }
+            requireActivity().finish()
         }
 
         // Toggle izmedju login i registracija moda.

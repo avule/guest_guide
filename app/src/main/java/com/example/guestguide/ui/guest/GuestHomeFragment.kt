@@ -14,10 +14,10 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
-import androidx.navigation.fragment.navArgs
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
 import com.example.guestguide.BuildConfig
+import com.example.guestguide.GuestActivity
 import com.example.guestguide.R
 import com.example.guestguide.databinding.FragmentGuestHomeBinding
 import com.example.guestguide.ui.adapter.ContactsAdapter
@@ -33,7 +33,6 @@ class GuestHomeFragment : Fragment() {
     private val binding get() = _binding!!
 
     private val viewModel: SharedViewModel by activityViewModels()
-    private val args: GuestHomeFragmentArgs by navArgs()
     private lateinit var contactsAdapter: ContactsAdapter
 
     override fun onCreateView(
@@ -46,17 +45,21 @@ class GuestHomeFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        // accessCode dolazi iz SafeArgs. Bitno ako OS ubije proces pa se ViewModel resetuje.
-        // Funkcija je idempotentna. Ako vec slusamo isti kod, ne radi nista.
-        viewModel.connectToApartment(args.accessCode)
+        // accessCode dolazi iz Intent extras-a koji je postavila WelcomeActivity.
+        // connectToApartment je idempotentan. Ako vec slusamo isti kod, ne radi nista.
+        val accessCode = requireActivity().intent.getStringExtra(GuestActivity.EXTRA_ACCESS_CODE) ?: ""
+        if (accessCode.isNotEmpty()) {
+            viewModel.connectToApartment(accessCode)
+        }
         setupUI()
         setupObservers()
     }
 
     // Postavlja klik listenere i horizontalnu listu kontakata.
     private fun setupUI() {
+        // X dugme zatvara cijelu GuestActivity i vraca korisnika na Welcome.
         binding.ivExit.setOnClickListener {
-            findNavController().popBackStack()
+            requireActivity().finish()
         }
 
         // Klik na lozinku je kopira u clipboard.
