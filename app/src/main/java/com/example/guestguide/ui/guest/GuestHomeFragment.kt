@@ -154,7 +154,7 @@ class GuestHomeFragment : Fragment() {
                                 binding.tvRules.text = "Nema posebnih pravila."
                             }
 
-                            // Mapu prikazujemo kao sliku preko Maps Static API-ja. Lakše nego puni Maps SDK.
+                            // Mapu prikazujemo kao sliku preko Maps Static API-ja.
                             if (apartment.location.isNotEmpty()) {
                                 binding.cardMap.visibility = View.VISIBLE
                                 binding.tvLocationLabel.visibility = View.VISIBLE
